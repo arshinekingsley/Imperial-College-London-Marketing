@@ -1,1 +1,1 @@
-# Imperial-College-London---Marketing
+# Imperial-College-London - Marketing
