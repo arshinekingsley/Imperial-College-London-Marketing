@@ -17,7 +17,7 @@ Using the **openFDA APIs** (including the MAUDE and FAERS databases), the analys
 * **Drug adverse event reports** (Pharma safety reporting volume)
 * **Drug-related death reports** (Mortality-related safety indicator)
 
-These quantitative measures are combined with qualitative marketing factors—including product quality, pricing, service, clinical evidence, adherence, and brand trust—to construct weighted competitive scorecards. Each company receives standardized scores on a **1–5 scale**, followed by an overall weighted score to facilitate competitor benchmarking.
+These quantitative measures are combined with qualitative marketing factors—including product quality, pricing, service, clinical evidence, adherence, and brand trust—to construct weighted competitive scorecards. Each company receives standardized scores on a 1-5 scale, followed by an overall weighted score to facilitate competitor benchmarking.
 
 ---
 
