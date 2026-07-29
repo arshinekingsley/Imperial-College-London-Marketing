@@ -1,150 +1,134 @@
-#   BAYER SCORECARD – BASED on FDA MAUDE AND FAERs DATA
-
 import requests
-import urllib3
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from math import pi
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# NORMALIZATION FUNCTION
-
+# NORMALIZATION FUNCTION (1 to 5 scale)
 def normalize(series, invert=False):
     x = series.astype(float)
     if x.max() == x.min():
-        return pd.Series([3] * len(x))
+        return pd.Series([3.0] * len(x))
     if invert:
-        norm = 1 - ((x - x.min()) / (x.max() - x.min()))
+        norm = 1.0 - ((x - x.min()) / (x.max() - x.min()))
     else:
         norm = (x - x.min()) / (x.max() - x.min())
-    return 1 + 4 * norm
+    return 1.0 + 4.0 * norm
 
-# DEVICE SEGMENT API FUNCTIONS (RADIOLGY)
+# FDA API HELPERS
+def get_fda_count(endpoint, search_query):
+    """Uses openFDA count feature to get actual totals without hitting limits."""
+    url = f"https://api.fda.gov/{endpoint}.json"
+    params = {"search": search_query}
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code == 200:
+            return r.json().get("meta", {}).get("results", {}).get("total", 0)
+    except Exception as e:
+        print(f"Error querying {endpoint}: {e}")
+    return 0
 
-def get_recalls(manufacturer, limit=1000):
-    url = "https://api.fda.gov/device/recall.json"
-    query = {"search": f"recalling_firm:{manufacturer}", "limit": limit}
-    r = requests.get(url, params=query, verify=False)
-    return r.json().get("results", []) if r.status_code == 200 else []
-
-def get_510k(manufacturer, limit=1000):
-    url = "https://api.fda.gov/device/510k.json"
-    query = {"search": f"applicant:{manufacturer}", "limit": limit}
-    r = requests.get(url, params=query, verify=False)
-    return r.json().get("results", []) if r.status_code == 200 else []
-
-# PHARMA SEGMENT API FUNCTIONS (FAERS)
-
-def get_faers(drug, limit=1000):
-    url = "https://api.fda.gov/drug/event.json"
-    query = {"search": f"patient.drug.medicinalproduct:{drug}", "limit": limit}
-    r = requests.get(url, params=query, verify=False)
-    return r.json().get("results", []) if r.status_code == 200 else []
-
-# RADIOLGY DATA COLLECTION 
-
+# RADIOLOGY DATA COLLECTION
 radiology_companies = ["Bayer", "GE Healthcare", "Siemens", "Philips", "Canon", "ACIST"]
 
-# Best-estimate overrides for FDA 1000s
-best_estimates = {
-    "GE Healthcare": {"Recalls": 150, "Innovation": 800},
-    "Siemens": {"Recalls": 120, "Innovation": 700},
-    "Philips": {"Recalls": 130, "Innovation": 964}
-}
+radiology_data = []
+for company in radiology_companies:
+    recalls = get_fda_count("device/recall", f'recalling_firm:"{company}"')
+    clearances = get_fda_count("device/510k", f'applicant:"{company}"')
+    
+    radiology_data.append({
+        "Company": company,
+        "Recalls": recalls,
+        "Innovation_510k": clearances
+    })
 
-radiology = {"Company": [], "Recalls": [], "Innovation": []}
+df_rad = pd.DataFrame(radiology_data)
 
-for c in radiology_companies:
-    recall_data = get_recalls(c)
-    innov_data = get_510k(c)
+# Normalize Metrics
+df_rad["Recall_Score"] = normalize(df_rad["Recalls"], invert=True)       # Fewer recalls = Higher Score
+df_rad["Innovation_Score"] = normalize(df_rad["Innovation_510k"], invert=False) # More 510k = Higher Score
+df_rad["Final_Score"] = (df_rad["Recall_Score"] * 0.5) + (df_rad["Innovation_Score"] * 0.5)
 
-    # Apply best-estimates if API returns 1000
-    recalls = len(recall_data)
-    innovation = len(innov_data)
-    if recalls >= 1000 or innovation >= 1000:
-        recalls = best_estimates.get(c, {}).get("Recalls", recalls)
-        innovation = best_estimates.get(c, {}).get("Innovation", innovation)
+# PHARMA DATA COLLECTION
+pharma_portfolio = [
+    {"Company": "Bayer", "Drug": "Xarelto"},
+    {"Company": "Johnson & Johnson", "Drug": "Stelara"},
+    {"Company": "Sanofi", "Drug": "Dupixent"},
+    {"Company": "Novartis", "Drug": "Entresto"},
+    {"Company": "GSK", "Drug": "Trelegy"},
+    {"Company": "Abbott", "Drug": "Synthroid"}
+]
 
-    radiology["Company"].append(c)
-    radiology["Recalls"].append(recalls)
-    radiology["Innovation"].append(innovation)
+pharma_data = []
+for item in pharma_portfolio:
+    drug = item["Drug"]
+    
+    total_events = get_fda_count("drug/event", f'patient.drug.medicinalproduct:"{drug}"')
+    deaths = get_fda_count("drug/event", f'patient.drug.medicinalproduct:"{drug}" AND seriousnessdeath:1')
+    
+    pharma_data.append({
+        "Company": item["Company"],
+        "Drug": drug,
+        "Total_Events": total_events,
+        "Death_Events": deaths
+    })
 
-df_rad = pd.DataFrame(radiology)
-print("\nRADIOLGY RAW DATA:")
-print(df_rad)
+df_pharma = pd.DataFrame(pharma_data)
 
-# PHARMA DATA COLLECTION 
+# Score Calculations
+df_pharma["Safety_Score"] = normalize(df_pharma["Total_Events"], invert=True)
+df_pharma["Mortality_Risk_Score"] = normalize(df_pharma["Death_Events"], invert=True)
+df_pharma["Final_Score"] = (df_pharma["Safety_Score"] * 0.5) + (df_pharma["Mortality_Risk_Score"] * 0.5)
+pd.set_option('display.float_format', lambda x: '%.2f' % x)
+print("--- RADIOLOGY SCORECARD ---")
+print(df_rad[["Company", "Recalls", "Innovation_510k", "Recall_Score", "Innovation_Score", "Final_Score"]].to_string(index=False))
+print("\n--- PHARMA SCORECARD ---")
+df_pharma_display = df_pharma.copy()
+df_pharma_display["Total_Events"] = df_pharma_display["Total_Events"].apply(lambda x: f"{x:,}")
+df_pharma_display["Death_Events"] = df_pharma_display["Death_Events"].apply(lambda x: f"{x:,}")
+print(df_pharma_display[["Company", "Drug", "Total_Events", "Death_Events", "Safety_Score", "Mortality_Risk_Score", "Final_Score"]].to_string(index=False))
 
-pharma_companies = {
-    "Bayer": "Xarelto",
-    "Johnson & Johnson": "Stelara",
-    "Sanofi": "Dupixent",
-    "Novartis": "Entresto",
-    "GSK": "Trelegy",
-    "Abbott": "Synthroid"
-}
+# VISUALIZATIONS
 
-pharma = {"Company": [], "FAERS_Death": []}
+# Radiology Heatmap
+plt.figure(figsize=(8, 4))
+sns.heatmap(df_rad.set_index("Company")[["Recall_Score", "Innovation_Score", "Final_Score"]], 
+            annot=True, cmap="YlGnBu", vmin=1, vmax=5, fmt=".2f")
+plt.title("Radiology Segment – Competitive Scorecard (1-5 Scale)")
+plt.tight_layout()
+plt.show()
 
-for company, drug in pharma_companies.items():
-    faers = get_faers(drug)
-    death_count = sum(1 for e in faers if e.get("seriousnessdeath") == "1")
-    pharma["Company"].append(company)
-    pharma["FAERS_Death"].append(death_count)
+# Pharma Heatmap
+plt.figure(figsize=(8, 4))
+sns.heatmap(df_pharma.set_index("Company")[["Safety_Score", "Mortality_Risk_Score", "Final_Score"]], 
+            annot=True, cmap="YlGnBu", vmin=1, vmax=5, fmt=".2f")
+plt.title("Pharma Segment – Competitive Scorecard (1-5 Scale)")
+plt.tight_layout()
+plt.show()
 
-df_pharma = pd.DataFrame(pharma)
-print("\nPHARMA RAW DATA:")
-print(df_pharma)
-
-# RADIOLGY – NORMALIZATION + FINAL SCORE
-
-df_rad["Recall_Score"] = normalize(df_rad["Recalls"], invert=True)
-df_rad["Innovation_Score"] = normalize(df_rad["Innovation"], invert=False)
-df_rad["Final_Score"] = (df_rad["Recall_Score"] * 0.5 + df_rad["Innovation_Score"] * 0.5)
-
-print("\nRADIOLGY FINAL SCORECARD:")
-print(df_rad)
-
-# PHARMA – NORMALIZATION + FINAL SCORE
-
-df_pharma["Death_Score"] = normalize(df_pharma["FAERS_Death"], invert=True)
-df_pharma["Final_Score"] = df_pharma["Death_Score"]  # only metric used
-
-print("\nPHARMA FINAL SCORECARD:")
-print(df_pharma)
-
-# VISUALIZATION
-
-def radar_chart(df, company, title):
-    categories = df.columns[1:-1]
-    values = df[df["Company"] == company][categories].values.flatten().tolist()
-    values += values[:1]
-    angles = [n / float(len(categories)) * 2 * pi for n in range(len(categories))]
+# Multi-Axis Radar Chart Helper
+def plot_radar_chart(df, metrics, title):
+    num_vars = len(metrics)
+    angles = [n / float(num_vars) * 2 * pi for n in range(num_vars)]
     angles += angles[:1]
-    plt.figure(figsize=(6,6))
-    ax = plt.subplot(111, polar=True)
-    plt.xticks(angles[:-1], categories)
-    ax.plot(angles, values, linewidth=2)
-    ax.fill(angles, values, alpha=0.25)
-    plt.title(title)
+    
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    plt.xticks(angles[:-1], metrics)
+    ax.set_rlabel_position(0)
+    plt.yticks([1, 2, 3, 4, 5], ["1", "2", "3", "4", "5"], color="grey", size=7)
+    plt.ylim(0, 5)
+    
+    for i, row in df.iterrows():
+        values = row[metrics].values.flatten().tolist()
+        values += values[:1]
+        ax.plot(angles, values, linewidth=1.5, linestyle='solid', label=row['Company'])
+        ax.fill(angles, values, alpha=0.1)
+        
+    plt.title(title, size=11, y=1.1)
+    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+    plt.tight_layout()
     plt.show()
 
-# Bayer Radars
-radar_chart(df_rad, "Bayer", "Bayer Radiology Score – Radar Chart")
-radar_chart(df_pharma, "Bayer", "Bayer Pharma Score – Radar Chart")
-
-# Heatmaps
-plt.figure(figsize=(10, 6))
-sns.heatmap(df_rad.set_index("Company")[["Recall_Score","Innovation_Score","Final_Score"]],
-            annot=True, cmap="YlGnBu")
-plt.title("Radiology Competitors – Heatmap Scorecard")
-plt.show()
-
-plt.figure(figsize=(10, 6))
-sns.heatmap(df_pharma.set_index("Company")[["Death_Score","Final_Score"]],
-            annot=True, cmap="YlGnBu")
-plt.title("Pharma Competitors – Heatmap Scorecard")
-plt.show()
+# Plot Radar Charts
+plot_radar_chart(df_pharma, ["Safety_Score", "Mortality_Risk_Score", "Final_Score"], "Pharma Competitor Landscape")
