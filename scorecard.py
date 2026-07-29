@@ -31,7 +31,7 @@ expert_pharma_scores = {
 }
 
 # --- RADIOLOGY SCORECARD ---
-# Re-use live API scores from raw_data.py (Safety_Score & Innovation_Score)
+# Re-uses live API scores from raw_data.py (Safety_Score & Innovation_Score)
 # Map qualitative expert factors
 df_rad["Product_Quality"] = df_rad["Company"].map(lambda x: expert_rad_scores[x]["Product_Quality"])
 df_rad["Price"] = df_rad["Company"].map(lambda x: expert_rad_scores[x]["Price"])
