@@ -44,6 +44,41 @@ These quantitative measures are combined with qualitative marketing factors—in
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
+git clone https://github.com/your-username/your-repo-name.git
 cd your-repo-name
 pip install requests pandas numpy matplotlib seaborn
+```
+
+---
+
+## Usage
+
+Retrieve the latest regulatory data and generate exploratory visuals:
+```bash
+python raw_data.py
+```
+
+Generate the weighted competitive scorecards:
+```bash
+python scorecard.py
+```
+
+---
+
+## Methodology
+
+Objective regulatory metrics are normalized to a common 1–5 scale (using inverse min-max scaling for safety risk metrics) and combined with qualitative marketing assessments using weighted averages. The framework demonstrates a structured approach to competitive analysis by integrating public regulatory data with strategic marketing evaluation.
+
+*Note: The qualitative scores and weighting methodology are illustrative and were developed solely for academic analysis.*
+
+---
+
+## Academic Context
+
+This repository accompanies a Marketing Management paper completed as part of the MBA curriculum at Imperial College London. It contains only the Python implementation used to support the quantitative analysis and does not include the complete written paper or its broader strategic discussion.
+
+---
+
+## Disclaimer
+
+This project was developed for educational purposes. It is not affiliated with Bayer, the U.S. Food and Drug Administration (FDA), or any other organization. The analysis should not be interpreted as investment, clinical, regulatory, or commercial advice.
