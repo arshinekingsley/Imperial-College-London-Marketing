@@ -10,7 +10,7 @@ Rather than representing the complete coursework submission, this repository con
 
 The project demonstrates how publicly available regulatory data can be integrated with expert-weighted marketing criteria to evaluate the competitive positioning of **Bayer** and its peer group across the medical device and pharmaceutical industries.
 
-Using the **openFDA APIs** (including the MAUDE and FAERS databases), the analysis retrieves objective regulatory indicators such as:
+Using the **openFDA APIs** (including the MAUDE and FAERS databases), the analysis retrieves publically available regulatory indicators such as:
 
 * **Medical device recalls** (Device safety profile)
 * **FDA 510(k) clearances** (Innovation & market entry activity)
