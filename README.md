@@ -44,8 +44,8 @@ These quantitative measures are combined with qualitative marketing factors—in
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/your-username/your-repo-name.git
-cd your-repo-name
+git clone https://github.com/arshinekingsley/Imperial-College-London-Marketing
+cd Imperial-College-London-Marketing
 pip install requests pandas numpy matplotlib seaborn
 ```
 
